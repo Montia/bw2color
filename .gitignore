@@ -1,0 +1,8 @@
+# ignore pycharm file
+*.iml
+.idea/
+
+# ignore dataset but keep dataset dir
+data/**
+out/**
+!.gitkeep
