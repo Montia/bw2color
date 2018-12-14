@@ -2,6 +2,12 @@ import PIL.Image as Image
 import os
 from tqdm import tqdm
 import random
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--data', default='./data/')
+parser.add_argument('--save', default='./out/crop/')
+
 
 
 def stretch_img(path, shape=(256, 256)):
@@ -45,10 +51,14 @@ def preprocess(input, output, method, train_ratio=0.8):
 
     for image in tqdm(files):
         train = 'train/' if random.random() < train_ratio else 'test/'
-        color_with_gray(resize(image, method)).save(output + train + image.split('/')[-1])
+        try:
+            color_with_gray(resize(image, method)).save(output + train + image.split('/')[-1])
+        except:
+            print('image %s is wrong' % image)
 
 
 if __name__ == '__main__':
-    data = './data/'
-    save = './out/crop/'
+    a = parser.parse_args()
+    data = a.data
+    save = a.save
     preprocess(data, save, crop_img)

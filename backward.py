@@ -5,6 +5,7 @@ from time import sleep
 import os
 import forward
 import generateds
+from tqdm import tqdm
 
 BATCH_SIZE = 1
 L1_WEIGHT = 100
@@ -83,7 +84,7 @@ def backward():
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
         
-        for i in range(global_step.eval(), TOTAL_STEP):
+        for i in tqdm(range(global_step.eval(), TOTAL_STEP)):
             xs, ys = sess.run([X_batch, Y_real_batch])
             _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
             if step % 500 == 0:

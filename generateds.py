@@ -3,6 +3,17 @@ from PIL import Image
 import tensorflow as tf
 import os
 from tqdm import tqdm
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('prefix', default='.')
+
+image_train_path = './out/test/train'
+image_test_path = './out/test/test'
+tfRecord_train = './tfrecord/pix2pix_train.tfrecords'
+tfRecord_test = './tfrecord/pix2pix_test.tfrecords'
+data_path = './tfrecord'
+image_shape = [256, 256, 3]
 
 
 def write_tfRecord(tfRecordName, image_path):
@@ -71,7 +82,7 @@ def test_get_tfrecord():
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         for i in [1, 2, 3]:
             xs, ys = sess.run([x, y])
-            arr = ((xs + 1) * 128).astype(np.uint8)
+            arr = ((ys + 1) * 128).astype(np.uint8)
             img = Image.fromarray(arr)
             img.save('%d.jpg' % i)
         coord.request_stop()
@@ -79,12 +90,11 @@ def test_get_tfrecord():
 
 
 if __name__ == '__main__':
-    image_train_path = './out/test/train'
-    image_test_path = './out/test/test'
-    tfRecord_train = './tfrecord/pix2pix_train.tfrecords'
-    tfRecord_test = './tfrecord/pix2pix_test.tfrecords'
-    data_path = './tfrecord'
-    image_shape = [256, 256, 3]
-
+    a = parser.parse_args()
+    image_train_path = a.prefix + '/out/test/train'
+    image_test_path = a.prefix + '/out/test/test'
+    tfRecord_train = a.prefix + '/tfrecord/pix2pix_train.tfrecords'
+    tfRecord_test = a.prefix + '/tfrecord/pix2pix_test.tfrecords'
+    data_path = a.prefix + '/tfrecord'
     # test_get_tfrecord()
-# generate_tfRecord()
+    generate_tfRecord()

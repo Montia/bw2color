@@ -1,13 +1,14 @@
 import requests as rq
 from bs4 import BeautifulSoup
 import os
-import PIL.Image as image
-import PIL
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--path', default='./data/')
 
 # Global configurations
 url = 'https://wall.alphacoders.com/search.php?search=%s&lang=Chinese&page=%d'
 mozilla_header = {"User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:41.0) Gecko/20100101 Firefox/41.0', }
-PATH = './data/'
 ANIME_LIST = ['your+name', 'love+live', 'The+Melancholy+Of+Haruhi+Suzumiya', 'hyouka', 'Sound+Euphonium']
 
 
@@ -67,4 +68,5 @@ def download_wallpaper():
 
 
 if __name__ == '__main__':
+    PATH = parser.parse_args().path
     download_wallpaper()
