@@ -1,5 +1,5 @@
 import numpy as np
-import tensorflow as tf 
+import tensorflow as tf
 import os
 from PIL import Image
 import forward
@@ -8,6 +8,7 @@ import backward
 
 TEST_NUM = 1
 TEST_RESULT_PATH = 'test_result'
+
 
 def test():
     X = tf.placeholder(tf.float32, [None, 256, 256, 3])
@@ -31,9 +32,11 @@ def test():
         else:
             print('Checkpoint Not Found')
             return
-        
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
         xs, ys = sess.run([X_batch, Y_real_batch])
-        test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
+        test_result = sess.run(XYY, feed_dict={X: xs, Y_real: ys})
         if not os.path.exists(TEST_RESULT_PATH):
             os.mkdir(TEST_RESULT_PATH)
         for i, img in enumerate(test_result):
@@ -41,7 +44,10 @@ def test():
             img *= 256
             img = img.astype(np.uint8)
             Image.fromarray(img).save(os.path.join(TEST_RESULT_PATH, '{}.png'.format(i)))
-            
+
+        coord.request_stop()
+        coord.join(threads)
+
+
 if __name__ == '__main__':
     test()
-

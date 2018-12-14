@@ -7,4 +7,6 @@ data/**
 out/**
 tfrecord/**
 model/**
+training_result/**
+test_result/**
 !.gitkeep
