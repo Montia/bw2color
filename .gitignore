@@ -5,4 +5,5 @@
 # ignore dataset but keep dataset dir
 data/**
 out/**
+tfrecord/**
 !.gitkeep
