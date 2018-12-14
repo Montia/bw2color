@@ -6,4 +6,5 @@
 data/**
 out/**
 tfrecord/**
+model/**
 !.gitkeep

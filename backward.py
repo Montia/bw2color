@@ -1,6 +1,6 @@
 import numpy as np
 from PIL import Image
-import tensorflow as tf 
+import tensorflow as tf
 from time import sleep
 import os
 import forward
@@ -52,7 +52,7 @@ def backward():
     with tf.name_scope('discriminator_fake'):
         with tf.variable_scope('discriminator', reuse=True):
             discriminator_fake = discriminator(X, Y)
-    
+
     gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
     gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
     gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
@@ -66,13 +66,13 @@ def backward():
     dis_optimizer = tf.train.AdadeltaOptimizer(LEARNING_RATE, BETA1)
     dis_grads_and_vars = dis_optimizer.compute_gradients(dis_loss, var_list=dis_vars)
     dis_training_op = dis_optimizer.apply_gradients(dis_grads_and_vars)
-    
+
     ema = tf.train.ExponentialMovingAverage(EMA_DECAY)
     ema_op = ema.apply(tf.trainable_variables())
 
     global_step = tf.Variable(0, trainable=False)
     incr_global_step = tf.assign(global_step, global_step + 1)
-    
+
     train_op = tf.group([gen_training_op, dis_training_op, ema_op, incr_global_step])
 
     saver = tf.train.Saver()
@@ -83,11 +83,14 @@ def backward():
         ckpt = tf.train.get_checkpoint_state(MODEL_SAVE_PATH)
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
-        
+
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
         for i in tqdm(range(global_step.eval(), TOTAL_STEP)):
             xs, ys = sess.run([X_batch, Y_real_batch])
             _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
-            if step % 500 == 0:
+            if step % 50 == 0:
                 gloss, dloss = sess.run([gen_loss, dis_loss], feed_dict={X:xs, Y_real:ys})
                 print('\rAfter {} steps, the loss of generator is {}, the loss of discriminator is {}'.format(step, gloss, dloss))
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
@@ -100,6 +103,9 @@ def backward():
                     img = img.astype(np.uint8)
                     Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step-{}.png'.format(step)))
             print('\r{}'.format(step), end='')
+
+        coord.request_stop()
+        coord.join(threads)
 
 
 if __name__ == '__main__':

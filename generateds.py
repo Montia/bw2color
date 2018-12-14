@@ -3,17 +3,13 @@ from PIL import Image
 import tensorflow as tf
 import os
 from tqdm import tqdm
-import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('prefix', default='.')
-
-image_train_path = './out/test/train'
-image_test_path = './out/test/test'
+image_train_path = './out/crop/train'
+image_test_path = './out/crop/test'
 tfRecord_train = './tfrecord/pix2pix_train.tfrecords'
 tfRecord_test = './tfrecord/pix2pix_test.tfrecords'
 data_path = './tfrecord'
-image_shape = [256, 256, 3]
+image_shape = [1, 256, 256, 3]
 
 
 def write_tfRecord(tfRecordName, image_path):
@@ -65,6 +61,7 @@ def read_tfRecord(tfRecord_path):
 
 
 def get_tfrecord(num, isTrain=True):
+    image_shape[0] = num
     tfRecord_path = tfRecord_train if isTrain else tfRecord_test
 
     X, Y = read_tfRecord(tfRecord_path)
@@ -75,7 +72,7 @@ def get_tfrecord(num, isTrain=True):
 
 # rebuild image to check
 def test_get_tfrecord():
-    x, y = get_tfrecord(1)
+    x, y = get_tfrecord(1, True)
     with tf.Session() as sess:
         # sess.run(tf.global_variables_initializer())
         coord = tf.train.Coordinator()
@@ -90,11 +87,5 @@ def test_get_tfrecord():
 
 
 if __name__ == '__main__':
-    a = parser.parse_args()
-    image_train_path = a.prefix + '/out/test/train'
-    image_test_path = a.prefix + '/out/test/test'
-    tfRecord_train = a.prefix + '/tfrecord/pix2pix_train.tfrecords'
-    tfRecord_test = a.prefix + '/tfrecord/pix2pix_test.tfrecords'
-    data_path = a.prefix + '/tfrecord'
-    # test_get_tfrecord()
-    generate_tfRecord()
+    # generate_tfRecord()
+    test_get_tfrecord()
