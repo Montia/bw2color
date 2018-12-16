@@ -52,10 +52,12 @@ def read_tfRecord(tfRecord_path):
                                        })
     X = tf.decode_raw(features['X'], tf.uint8)
     X = tf.reshape(X, image_shape)
-    X = tf.cast(X, tf.float32) * (1. / 255)
+    # X = tf.cast(X, tf.float32) * (1. / 255)
+    X = tf.cast(X, tf.float32) / 128 - 1
     Y = tf.decode_raw(features['Y'], tf.uint8)
     Y = tf.reshape(Y, image_shape)
-    Y = tf.cast(Y, tf.float32) * (1. / 255)
+    # Y = tf.cast(Y, tf.float32) * (1. / 255)
+    Y = tf.cast(Y, tf.float32) / 128 - 1
 
     return X, Y
 
@@ -87,5 +89,5 @@ def test_get_tfrecord():
 
 
 if __name__ == '__main__':
-    # generate_tfRecord()
-    test_get_tfrecord()
+    generate_tfRecord()
+    # test_get_tfrecord()
