@@ -18,6 +18,8 @@ MODEL_SAVE_PATH = './model'
 MODEL_NAME = 'pix2pix_model'
 TOTAL_STEP = 100000
 TRAINING_RESULT_PATH = 'training_result'
+SAVE_FREQ = 500
+DISPLAY_FREQ = 10
 
 def backward():
     def dis_conv(X, kernels, stride, layer, regularizer=None):
@@ -90,10 +92,11 @@ def backward():
         for i in tqdm(range(global_step.eval(), TOTAL_STEP)):
             xs, ys = sess.run([X_batch, Y_real_batch])
             _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
-            if step % 50 == 0:
+            if step % SAVE_FREQ == 0:
                 gloss, dloss = sess.run([gen_loss, dis_loss], feed_dict={X:xs, Y_real:ys})
                 print('\rAfter {} steps, the loss of generator is {}, the loss of discriminator is {}'.format(step, gloss, dloss))
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
+            if step % DISPLAY_FREQ == 0:
                 test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
                 if not os.path.exists(TRAINING_RESULT_PATH):
                     os.mkdir(TRAINING_RESULT_PATH)
@@ -102,7 +105,7 @@ def backward():
                     img *= 256
                     img = img.astype(np.uint8)
                     Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step-{}.png'.format(step)))
-            print('\r{}'.format(step), end='')
+            # print('\r{}'.format(step), end='')
 
         coord.request_stop()
         coord.join(threads)
