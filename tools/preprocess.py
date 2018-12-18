@@ -4,34 +4,61 @@ from tqdm import tqdm
 import random
 import argparse
 
+""" input params """
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', default='./data/')
 parser.add_argument('--save', default='./out/crop/')
+# t - use sketch model, f - use basic gray
+parser.add_argument('--method', default='gray')
+parser.add_argument('--mod_path', default='/home/u22520/mod.h5')
 
 
-
-def stretch_img(path, shape=(256, 256)):
-    img = Image.open(path)
+def stretch_img(img, shape=(256, 256)):
     img = img.resize(shape, Image.ANTIALIAS)
     return img
 
 
-def crop_img(path, shape=(256, 256)):
-    img = Image.open(path)
+def crop_img(img, shape=(256, 256)):
     img = img.crop((0, 0, 219, 219))
     img = img.resize(shape, Image.ANTIALIAS)
     return img
 
 
+def padding_to_512(img):
+    new_img = Image.new('RGB', (512, 512), (255, 255, 255))
+    new_img.paste(img, (0, 0))
+    return new_img
+
+
+def color2sketch_512(path):
+    """ use sketchKeras project extract sketch """
+    return Image.fromarray(get(path, '', mod))
+
+
+def color2sketch_256(path):
+    """
+    use sketchKeras project extract sketch
+    1. padding to 512x512 -> 2. get sketch -> 3. crop to 256x256
+    """
+    img_512 = padding_to_512(path)
+    sketch = Image.fromarray(get(img_512, '', mod))
+    return sketch.crop((0, 0, 256, 256))
+
+
+def joint256img(left, right):
+    new_img = Image.new('RGB', (512, 256))
+    new_img.paste(left, (0, 0))
+    new_img.paste(right, (256, 0))
+    return new_img
+
+
 # Combine image with its gray image horizontally [img, gray_img]
 def color_with_gray(img: Image):
-    gray_img = img.convert('L')
-    new_img = Image.new('RGB', (512, 256))
+    return joint256img(img, img.convert('L'))
 
-    new_img.paste(img, (0, 0))
-    new_img.paste(gray_img, (256, 0))
 
-    return new_img
+def color_with_sketch(img: Image):
+    return joint256img(img, color2sketch_256(img))
 
 
 def resize(path, method):
@@ -51,14 +78,54 @@ def preprocess(input, output, method, train_ratio=0.8):
 
     for image in tqdm(files):
         train = 'train/' if random.random() < train_ratio else 'test/'
+<<<<<<< HEAD
         try:
             color_with_gray(resize(image, method)).save(output + train + image.split('/')[-1])
         except:
             print('image %s is wrong' % image)
+=======
+        save_path = output + train + image.split('/')[-1]
+        try:
+            method(image).save(save_path)
+        except:
+            print('image %s is wrong' % image)
+
+
+# ============================================================================
+# preprocess functions
+# name rule: [resize method]2[target]
+# input:    image path
+# output:   PIL image object
+
+def crop2gray(path):
+    img = Image.open(path)
+    return color_with_gray(crop_img(img))
+
+
+def crop2sketch(path):
+    img = Image.open(path)
+    return color_with_sketch(crop_img(img))
+>>>>>>> 191b56bdbe429aaf4d3c9c785acc41c431919ddc
 
 
 if __name__ == '__main__':
     a = parser.parse_args()
     data = a.data
     save = a.save
+<<<<<<< HEAD
     preprocess(data, save, crop_img)
+=======
+    method = a.method
+    mod_path = a.mod_path
+
+    if save[-1] != '/':
+        save += '/'
+
+    process_method = crop2gray
+    if method == 'sketch':
+        process_method = crop2sketch
+        mod = load_model(a.mod_path)
+
+    print('use %s method to process images in %s to %s' % (method, data, save))
+    preprocess(data, save, process_method)
+>>>>>>> 191b56bdbe429aaf4d3c9c785acc41c431919ddc
