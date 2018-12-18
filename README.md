@@ -38,7 +38,7 @@ cd bw2color
 # basic use
 python tools/preprocess.py
 # set data dir
-python tools/preprocess.py --data [data dir] --save  [output dir] --method
+python tools/preprocess.py --data [data dir] --save  [output dir]
 # set process method
 python tools/preprocess.py --method gray
 python tools/preprocess.py --method sketch --mod_path [mod file path]
