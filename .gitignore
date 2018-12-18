@@ -13,3 +13,4 @@ test_result/**
 
 # ignore pycache
 __pycache__/**
+tmp/
