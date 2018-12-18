@@ -3,15 +3,11 @@ import os
 from tqdm import tqdm
 import random
 import argparse
-from sketchKeras.main import get
-from keras.models import load_model
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', default='./data/')
 parser.add_argument('--save', default='./out/crop/')
 
-mod = load_model('/home/u22520/mod.h5')
-# mod = None
 
 
 def stretch_img(path, shape=(256, 256)):
@@ -25,27 +21,6 @@ def crop_img(path, shape=(256, 256)):
     img = img.crop((0, 0, 219, 219))
     img = img.resize(shape, Image.ANTIALIAS)
     return img
-
-
-def padding_to_512(img):
-    new_img = Image.new('RGB', (512, 512), (255, 255, 255))
-    new_img.paste(img, (0, 0))
-    return new_img
-
-
-def color2sketch_512(path):
-    """ use sketchKeras project extract sketch """
-    return Image.fromarray(get(path, '', mod))
-
-
-def color2sketch_256(path):
-    """
-    use sketchKeras project extract sketch
-    1. padding to 512x512 -> 2. get sketch -> 3. crop to 256x256
-    """
-    img_512 = padding_to_512(path)
-    sketch = Image.fromarray(get(img_512, '', mod))
-    return sketch.crop((0, 0, 256, 256))
 
 
 # Combine image with its gray image horizontally [img, gray_img]
@@ -76,12 +51,10 @@ def preprocess(input, output, method, train_ratio=0.8):
 
     for image in tqdm(files):
         train = 'train/' if random.random() < train_ratio else 'test/'
-        save_path = output + train + image.split('/')[-1]
-        # try:
-        # color_with_gray(resize(image, method)).save(save_path)
-        color2sketch_256(resize(image, method)).save(save_path)
-        # except:
-        #     print('image %s is wrong' % image)
+        try:
+            color_with_gray(resize(image, method)).save(output + train + image.split('/')[-1])
+        except:
+            print('image %s is wrong' % image)
 
 
 if __name__ == '__main__':
@@ -89,5 +62,3 @@ if __name__ == '__main__':
     data = a.data
     save = a.save
     preprocess(data, save, crop_img)
-    # color2sketch_256(
-    #     resize('C:/Users/Leeld/Documents/projects/bw2color/data/hyouka/1/thumb-350-286491.jpg', crop_img)).save('1.jpg')
