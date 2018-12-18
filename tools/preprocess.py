@@ -6,22 +6,21 @@ import argparse
 from sketchKeras.main import get
 from keras.models import load_model
 
+""" input params """
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', default='./data/')
 parser.add_argument('--save', default='./out/crop/')
+# t - use sketch model, f - use basic gray
+parser.add_argument('--method', default='gray')
+parser.add_argument('--mod_path', default='/home/u22520/mod.h5')
 
-mod = load_model('/home/u22520/mod.h5')
-# mod = None
 
-
-def stretch_img(path, shape=(256, 256)):
-    img = Image.open(path)
+def stretch_img(img, shape=(256, 256)):
     img = img.resize(shape, Image.ANTIALIAS)
     return img
 
 
-def crop_img(path, shape=(256, 256)):
-    img = Image.open(path)
+def crop_img(img, shape=(256, 256)):
     img = img.crop((0, 0, 219, 219))
     img = img.resize(shape, Image.ANTIALIAS)
     return img
@@ -48,15 +47,20 @@ def color2sketch_256(path):
     return sketch.crop((0, 0, 256, 256))
 
 
+def joint256img(left, right):
+    new_img = Image.new('RGB', (512, 256))
+    new_img.paste(left, (0, 0))
+    new_img.paste(right, (256, 0))
+    return new_img
+
+
 # Combine image with its gray image horizontally [img, gray_img]
 def color_with_gray(img: Image):
-    gray_img = img.convert('L')
-    new_img = Image.new('RGB', (512, 256))
+    return joint256img(img, img.convert('L'))
 
-    new_img.paste(img, (0, 0))
-    new_img.paste(gray_img, (256, 0))
 
-    return new_img
+def color_with_sketch(img: Image):
+    return joint256img(img, color2sketch_256(img))
 
 
 def resize(path, method):
@@ -77,17 +81,42 @@ def preprocess(input, output, method, train_ratio=0.8):
     for image in tqdm(files):
         train = 'train/' if random.random() < train_ratio else 'test/'
         save_path = output + train + image.split('/')[-1]
-        # try:
-        # color_with_gray(resize(image, method)).save(save_path)
-        color2sketch_256(resize(image, method)).save(save_path)
-        # except:
-        #     print('image %s is wrong' % image)
+        try:
+            method(image).save(save_path)
+        except:
+            print('image %s is wrong' % image)
+
+
+# ============================================================================
+# preprocess functions
+# name rule: [resize method]2[target]
+# input:    image path
+# output:   PIL image object
+
+def crop2gray(path):
+    img = Image.open(path)
+    return color_with_gray(crop_img(img))
+
+
+def crop2sketch(path):
+    img = Image.open(path)
+    return color_with_sketch(crop_img(img))
 
 
 if __name__ == '__main__':
     a = parser.parse_args()
     data = a.data
     save = a.save
-    preprocess(data, save, crop_img)
-    # color2sketch_256(
-    #     resize('C:/Users/Leeld/Documents/projects/bw2color/data/hyouka/1/thumb-350-286491.jpg', crop_img)).save('1.jpg')
+    method = a.method
+    mod_path = a.mod_path
+
+    if save[-1] != '/':
+        save += '/'
+
+    process_method = crop2gray
+    if method == 'sketch':
+        process_method = crop2sketch
+        mod = load_model(a.mod_path)
+
+    print('use %s method to process images in %s to %s' % (method, data, save))
+    preprocess(data, save, process_method)

@@ -10,3 +10,6 @@ model/**
 training_result/**
 test_result/**
 !.gitkeep
+
+# ignore pycache
+__pycache__/**
