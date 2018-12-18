@@ -23,8 +23,8 @@
 
 效果：
 
-<img src='res/1.jpg' width="200">
-<img src='res/2.jpg' width="200">
+<img src='res/1.jpg' width="400">
+<img src='res/2.jpg' width="400">
 
 
 [3] [cGAN-based Manga Colorization Using a Single Training Image](https://arxiv.org/abs/1706.06918)
@@ -33,8 +33,8 @@
 
 效果：
 
-<img src='res/4.jpg' width="200">
+<img src='res/4.jpg' width="400">
 
 [4] https://github.com/Muks14x/CS299_22_27
 
-<img src='res/3.jpg' width="200">
+<img src='res/3.jpg' width="400">
