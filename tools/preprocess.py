@@ -78,12 +78,6 @@ def preprocess(input, output, method, train_ratio=0.8):
 
     for image in tqdm(files):
         train = 'train/' if random.random() < train_ratio else 'test/'
-<<<<<<< HEAD
-        try:
-            color_with_gray(resize(image, method)).save(output + train + image.split('/')[-1])
-        except:
-            print('image %s is wrong' % image)
-=======
         save_path = output + train + image.split('/')[-1]
         try:
             method(image).save(save_path)
@@ -105,16 +99,12 @@ def crop2gray(path):
 def crop2sketch(path):
     img = Image.open(path)
     return color_with_sketch(crop_img(img))
->>>>>>> 191b56bdbe429aaf4d3c9c785acc41c431919ddc
 
 
 if __name__ == '__main__':
     a = parser.parse_args()
     data = a.data
     save = a.save
-<<<<<<< HEAD
-    preprocess(data, save, crop_img)
-=======
     method = a.method
     mod_path = a.mod_path
 
@@ -128,4 +118,3 @@ if __name__ == '__main__':
 
     print('use %s method to process images in %s to %s' % (method, data, save))
     preprocess(data, save, process_method)
->>>>>>> 191b56bdbe429aaf4d3c9c785acc41c431919ddc
