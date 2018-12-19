@@ -2,7 +2,8 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 8
+FIRST_OUTPUT_CHANNEL = 16
+MAX_OUTPUT_CHANNEL_LAYER = 5
 REGULARIZER = 0
 DROPOUT = 0.5
 
@@ -40,7 +41,7 @@ def forward(X, batch_size, training):
     layers = [X]
     #Encoder
     for i in range(8):
-        convolved = gen_conv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(7, i))
+        convolved = gen_conv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, i))
         normed = batchnorm(convolved)
         output = lrelu(normed)
         layers.append(output)
@@ -49,9 +50,9 @@ def forward(X, batch_size, training):
     for i in range(7):
         skip_layer = 8 - i
         if i == 0:
-            deconvolved = gen_deconv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(7, 6 - i), batch_size)
+            deconvolved = gen_deconv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 6 - i), batch_size)
         else:
-            deconvolved = gen_deconv(tf.concat([layers[-1], layers[skip_layer]], axis=3), FIRST_OUTPUT_CHANNEL * 2 ** min(3, 6 - i), batch_size)
+            deconvolved = gen_deconv(tf.concat([layers[-1], layers[skip_layer]], axis=3), FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 6 - i), batch_size)
         output = batchnorm(deconvolved)
         if i < 3 and training:
             output = tf.nn.dropout(output, 1 - DROPOUT)

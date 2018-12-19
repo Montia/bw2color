@@ -3,8 +3,6 @@ import os
 from tqdm import tqdm
 import random
 import argparse
-from sketchKeras.main import get
-from keras.models import load_model
 
 """ input params """
 parser = argparse.ArgumentParser()

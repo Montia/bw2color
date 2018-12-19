@@ -5,21 +5,21 @@ from time import sleep
 import os
 import forward
 import generateds
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 BATCH_SIZE = 1
-L1_WEIGHT = 1
+L1_WEIGHT = 100
 GAN_WEIGHT = 1
 EPS = 1e-12
 LEARNING_RATE = 2e-04
 BETA1 = 0.5
 EMA_DECAY = 0.98
-MODEL_SAVE_PATH = './model'
+MODEL_SAVE_PATH = './model_l1weight={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 MODEL_NAME = 'pix2pix_model'
 TOTAL_STEP = 100000
-TRAINING_RESULT_PATH = 'training_result'
-SAVE_FREQ = 500
-DISPLAY_FREQ = 10
+TRAINING_RESULT_PATH = 'training_result_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
+SAVE_FREQ = 5000
+DISPLAY_FREQ = 500
 
 def backward():
     def dis_conv(X, kernels, stride, layer, regularizer=None):
@@ -79,6 +79,12 @@ def backward():
 
     saver = tf.train.Saver()
     X_batch, Y_real_batch = generateds.get_tfrecord(BATCH_SIZE, True)
+
+    if not os.path.exists(MODEL_SAVE_PATH):
+        os.mkdir(MODEL_SAVE_PATH)
+    if not os.path.exists(TRAINING_RESULT_PATH):
+        os.mkdir(TRAINING_RESULT_PATH)
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
@@ -89,7 +95,7 @@ def backward():
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-        for i in tqdm(range(global_step.eval(), TOTAL_STEP)):
+        for i in range(global_step.eval(), TOTAL_STEP):
             xs, ys = sess.run([X_batch, Y_real_batch])
             _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
             if step % SAVE_FREQ == 0:
@@ -98,14 +104,12 @@ def backward():
                 glloss, ggloss, dloss = sess.run([gen_loss_L1, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
                 print('\rSteps: {}, Generator L1 loss: {}, Generator GAN loss: {}, Discriminator loss: {}'.format(step, glloss, ggloss, dloss))
                 test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
-                if not os.path.exists(TRAINING_RESULT_PATH):
-                    os.mkdir(TRAINING_RESULT_PATH)
                 for i, img in enumerate(test_result):
                     img = (img + 1) / 2
                     img *= 256
                     img = img.astype(np.uint8)
                     Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step-{}.png'.format(step)))
-            # print('\r{}'.format(step), end='')
+            print('\r{}'.format(step), end='')
 
         coord.request_stop()
         coord.join(threads)
