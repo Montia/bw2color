@@ -1,6 +1,19 @@
+"""
+a keras pretrained vgg19 model wrapper for tensorflow integration.
+
+Reference:
+
+blog: http://zachmoshe.com/2017/11/11/use-keras-models-with-tf.html
+code: https://github.com/zachmoshe/zachmoshe.com/blob/master/content/use-keras-models-with-tf/using-keras-models-in-tf.ipynb
+
+Thanks for zachmoshe's article
+"""
+
 import numpy as np
 import tensorflow as tf
 import tempfile
+# another wrapper to add a dense fc1 without relu
+from vgg19_fc1_wrapper import MYVGG19
 
 RGB_MEAN_PIXELS = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3)).astype(np.float32)
 DEFAULT_IMAGE_SHAPE = (1, 224, 224, 3)
@@ -31,10 +44,13 @@ class VGG19():
                     img = tf.reverse(img, axis=[-1])
 
                 with tf.variable_scope('model'):
-                    self.vgg19 = tf.keras.applications.VGG19(weights='imagenet',
-                                                             include_top=True, input_tensor=img)
+                    # self.vgg19 = tf.keras.applications.VGG19(weights='imagenet', include_top=True, input_tensor=img)
+                    # using my vgg19 wrapper to add a dense fc1 without relu
+                    self.vgg19 = MYVGG19(weights='imagenet', include_top=True, input_tensor=img)
 
-                self.outputs = {l.name: l.output for l in self.vgg19.layers}
+                # the only thing needed in this project
+                self.outputs = {'fc1': self.vgg19.output}
+                # self.outputs = {l.name: l.output for l in self.vgg19.layers}
 
             self.vgg_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='VGG19/model')
 
