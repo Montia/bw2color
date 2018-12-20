@@ -32,19 +32,19 @@ def backward():
     def discriminator(discriminator_input, discriminator_output):
         X = tf.concat([discriminator_input, discriminator_output], axis=3)
         layers = [X]
-        for i in range(5):
-            stride = 2 if i < 3 else 1
-            kernels = forward.FIRST_OUTPUT_CHANNEL * 2 ** i if i < 4 else 1
-            activation_fn = forward.lrelu if i < 4 else tf.nn.sigmoid
+        for i in range(6):
+            stride = 2 if i < 4 else 1
+            kernels = forward.FIRST_OUTPUT_CHANNEL * 2 ** i if i < 5 else 1
+            activation_fn = forward.lrelu if i < 5 else tf.nn.sigmoid
             layers.append(activation_fn(forward.batchnorm(dis_conv(layers[-1], kernels, stride, i+1))))
         #for layer in layers:
         #    print(layer)
         return layers[-1]
 
-    X = tf.placeholder(tf.float32, [None, 256, 256, 3])
+    X = tf.placeholder(tf.float32, [None, 512, 512, 3])
     with tf.name_scope('generator'), tf.variable_scope('generator'):
         Y = forward.forward(X, BATCH_SIZE, True)
-    Y_real = tf.placeholder(tf.float32, [None, 256, 256, 3])
+    Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
     XYY = tf.concat([X, Y, Y_real], axis=2)
 
     with tf.name_scope('discriminator_real'):

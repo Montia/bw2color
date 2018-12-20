@@ -2,13 +2,13 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 16
+FIRST_OUTPUT_CHANNEL = 8
 MAX_OUTPUT_CHANNEL_LAYER = 5
 REGULARIZER = 0
 DROPOUT = 0.5
 
 def get_weight(shape, regularizer=None):
-    w = tf.Variable(tf.truncated_normal(shape, stddev=0.2))
+    w = tf.Variable(tf.random_normal(shape, stddev=0.2))
     if regularizer != None:
         tf.add_to_collection('losses', tf.contrib.layers.l2_regularizer(regularizer)(w))
     return w
@@ -37,22 +37,22 @@ def lrelu(x, a=0.5):
     return ((1 + a) * x + (1 - a) * tf.abs(x)) / 2
 
 def forward(X, batch_size, training):
-    #X的形状为[None, 256, 256, 3], 值为-1到1
+    #X的形状为[None, 512, 512, 3], 值为-1到1
     layers = [X]
     #Encoder
-    for i in range(8):
+    for i in range(9):
         convolved = gen_conv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, i))
         normed = batchnorm(convolved)
         output = lrelu(normed)
         layers.append(output)
 
     #Decoder
-    for i in range(7):
-        skip_layer = 8 - i
+    for i in range(8):
+        skip_layer = 9 - i
         if i == 0:
-            deconvolved = gen_deconv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 6 - i), batch_size)
+            deconvolved = gen_deconv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
         else:
-            deconvolved = gen_deconv(tf.concat([layers[-1], layers[skip_layer]], axis=3), FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 6 - i), batch_size)
+            deconvolved = gen_deconv(tf.concat([layers[-1], layers[skip_layer]], axis=3), FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
         output = batchnorm(deconvolved)
         if i < 3 and training:
             output = tf.nn.dropout(output, 1 - DROPOUT)

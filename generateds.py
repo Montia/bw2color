@@ -9,7 +9,7 @@ image_test_path = './out/crop/test'
 tfRecord_train = './tfrecord/pix2pix_train.tfrecords'
 tfRecord_test = './tfrecord/pix2pix_test.tfrecords'
 data_path = './tfrecord'
-image_shape = [1, 256, 256, 3]
+image_shape = [1, 512, 512, 3]
 
 
 def write_tfRecord(tfRecordName, image_path):
@@ -18,8 +18,8 @@ def write_tfRecord(tfRecordName, image_path):
     for img_file in tqdm(os.listdir(image_path)):
         img = Image.open(image_path + '/' + img_file)
 
-        color_img = img.crop((0, 0, 256, 256))
-        grey_img = img.crop((256, 0, 512, 256))
+        color_img = img.crop((0, 0, 512, 512))
+        grey_img = img.crop((512, 0, 1024, 512))
 
         example = tf.train.Example(features=tf.train.Features(feature={
             'X': tf.train.Feature(bytes_list=tf.train.BytesList(value=[grey_img.tobytes()])),
