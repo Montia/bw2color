@@ -12,5 +12,5 @@ test_result/**
 !.gitkeep
 
 # ignore pycache
-__pycache__/**
+__pycache__
 tmp/
