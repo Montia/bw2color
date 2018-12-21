@@ -12,10 +12,6 @@ def get_weight(shape, regularizer=None):
         tf.add_to_collection('losses', tf.contrib.layers.l2_regularizer(regularizer)(w))
     return w
 
-def get_bias(shape):
-    b = tf.Variable(tf.zeros(shape))
-    return b
-
 def gen_conv(X, kernels, regularizer=None):
     w = get_weight([KERNEL_SIZE, KERNEL_SIZE, X.get_shape().as_list()[-1], kernels], regularizer)
     return tf.nn.conv2d(X, w, strides=[1, STRIDE, STRIDE, 1], padding='SAME')
