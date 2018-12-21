@@ -3,12 +3,13 @@ from PIL import Image
 import tensorflow as tf
 from time import sleep
 import os
+from time import sleep
 import forward
 import generateds
 from tqdm import tqdm, trange
 
 BATCH_SIZE = 1
-L1_WEIGHT = 100
+L1_WEIGHT = 0
 GAN_WEIGHT = 1
 EPS = 1e-12
 LEARNING_RATE = 2e-04
@@ -16,10 +17,10 @@ BETA1 = 0.5
 EMA_DECAY = 0.98
 MODEL_SAVE_PATH = './model_l1weight={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 MODEL_NAME = 'pix2pix_model'
-TOTAL_STEP = 100000
+TOTAL_STEP = 300000
 TRAINING_RESULT_PATH = 'training_result_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 SAVE_FREQ = 5000
-DISPLAY_FREQ = 500
+DISPLAY_FREQ = 1000
 
 def backward():
     def dis_conv(X, kernels, stride, layer, regularizer=None):
@@ -36,7 +37,8 @@ def backward():
             stride = 2 if i < 4 else 1
             kernels = forward.FIRST_OUTPUT_CHANNEL * 2 ** i if i < 5 else 1
             activation_fn = forward.lrelu if i < 5 else tf.nn.sigmoid
-            layers.append(activation_fn(forward.batchnorm(dis_conv(layers[-1], kernels, stride, i+1))))
+            bn = forward.batchnorm if i < 5 else tf.identity
+            layers.append(activation_fn(bn(dis_conv(layers[-1], kernels, stride, i+1))))
         #for layer in layers:
         #    print(layer)
         return layers[-1]
@@ -55,19 +57,20 @@ def backward():
         with tf.variable_scope('discriminator', reuse=True):
             discriminator_fake = discriminator(X, Y)
 
-    gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
-    gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
-    gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
-    gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
-    gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
-    gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
-    gen_training_op = gen_optimizer.apply_gradients(gen_grads_and_vars)
-
     dis_loss = tf.reduce_mean(-tf.log(discriminator_real + EPS) -tf.log(1 - discriminator_fake + EPS))
     dis_vars = [var for var in tf.trainable_variables() if var.name.startswith('discriminator')]
-    dis_optimizer = tf.train.AdadeltaOptimizer(LEARNING_RATE, BETA1)
+    dis_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
     dis_grads_and_vars = dis_optimizer.compute_gradients(dis_loss, var_list=dis_vars)
-    dis_training_op = dis_optimizer.apply_gradients(dis_grads_and_vars)
+    dis_train_op = dis_optimizer.apply_gradients(dis_grads_and_vars)
+
+    with tf.control_dependencies([dis_train_op]):
+        gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
+        gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
+        gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
+        gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
+        gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
+        gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
+        gen_train_op = gen_optimizer.apply_gradients(gen_grads_and_vars)
 
     ema = tf.train.ExponentialMovingAverage(EMA_DECAY)
     ema_op = ema.apply(tf.trainable_variables())
@@ -75,7 +78,7 @@ def backward():
     global_step = tf.Variable(0, trainable=False)
     incr_global_step = tf.assign(global_step, global_step + 1)
 
-    train_op = tf.group([gen_training_op, dis_training_op, ema_op, incr_global_step])
+    train_op = tf.group([dis_train_op, ema_op, incr_global_step])
 
     saver = tf.train.Saver()
     X_batch, Y_real_batch = generateds.get_tfrecord(BATCH_SIZE, True)
@@ -98,6 +101,8 @@ def backward():
         for i in range(global_step.eval(), TOTAL_STEP):
             xs, ys = sess.run([X_batch, Y_real_batch])
             _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
+            #print(sess.run(discriminator_real, feed_dict={X:xs, Y_real:ys}))
+            #sleep(30)
             if step % SAVE_FREQ == 0:
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
             if step % DISPLAY_FREQ == 0:
