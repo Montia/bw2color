@@ -22,22 +22,22 @@ def get_bias(shape):
     return b
 
 
-def gen_conv(X, channel, kernels, regularizer=None):
-    channel = int(channel)
-    kernels = int(kernels)
-    w = get_weight([KERNEL_SIZE, KERNEL_SIZE, channel, kernels], regularizer)
+def gen_conv(X, channel_out, regularizer=None):
+    channel_in = int(X.get_shape()[-1])
+    channel_out = int(channel_out)
+    w = get_weight([KERNEL_SIZE, KERNEL_SIZE, channel_in, channel_out], regularizer)
     return tf.nn.conv2d(X, w, strides=[1, STRIDE, STRIDE, 1], padding='SAME')
 
 
-def gen_deconv(X, channel, kernels, batch_size, regularizer=None):
-    channel = int(channel)
-    kernels = int(kernels)
-    w = get_weight([KERNEL_SIZE, KERNEL_SIZE, channel, kernels], regularizer)
+def gen_deconv(X, channel_out, batch_size, regularizer=None):
+    channel_in = int(X.get_shape()[-1])
+    channel_out = int(channel_out)
+    w = get_weight([KERNEL_SIZE, KERNEL_SIZE, channel_out, channel_in], regularizer)
     output_shape = X.get_shape().as_list()
     output_shape[0] = batch_size
     output_shape[1] *= 2
     output_shape[2] *= 2
-    output_shape[3] = channel
+    output_shape[3] = channel_out
     return tf.nn.conv2d_transpose(X, w, output_shape=output_shape, strides=[1, DESTRIDE, DESTRIDE, 1], padding='SAME')
 
 
@@ -59,23 +59,23 @@ def skip_connect(encoder_result, upsample_result):
     return tf.concat(values=[encoder_result, upsample_result], axis=-1)
 
 
-def double_conv(X, channel, kernel):
+def double_conv(X, kernel):
     # print(layers[-1].shape)
-    conv1 = gen_conv(X, channel, kernel)
+    conv1 = gen_conv(X, kernel)
     # todo check batch norm function
     norm1 = batchnorm(conv1)
     relu1 = tf.nn.relu(norm1)
     # print(relu1.shape)
 
-    conv2 = gen_conv(relu1, kernel, kernel)
+    conv2 = gen_conv(relu1, kernel)
     norm2 = batchnorm(conv2)
     relu2 = tf.nn.relu(norm2)
     # print(relu2.shape)
     return relu2
 
 
-def upsample(X, channel, kernel, batch_size):
-    up = gen_deconv(X, channel, kernel, batch_size)
+def upsample(X, kernel, batch_size):
+    up = gen_deconv(X, kernel, batch_size)
     norm = batchnorm(up)
     relu = tf.nn.relu(norm)
     dropout = tf.nn.dropout(x=relu, keep_prob=DROPOUT)
@@ -91,8 +91,7 @@ def forward(X, batch_size, training):
     for i in [64, 128, 256, 512]:
         # print(layers[-1].shape)
         # double conv
-        channel = 1 if i == 64 else i / 2
-        relu2 = double_conv(layers[-1], channel, i)
+        relu2 = double_conv(layers[-1], i)
         skip_layers.append(relu2)
 
         # max pool
@@ -102,10 +101,10 @@ def forward(X, batch_size, training):
         layers.append(pool)
 
     # bottom layer: double conv + unsample
-    relu2 = double_conv(layers[-1], 512, 1024)
+    relu2 = double_conv(layers[-1], 1024)
 
     # print("")
-    sample = upsample(relu2, 512, 1024, batch_size)
+    sample = upsample(relu2, 1024, batch_size)
     layers.append(sample)
 
     # 4 level Decoder: joint + double conv + upsample
@@ -113,20 +112,20 @@ def forward(X, batch_size, training):
         joint = skip_connect(skip_layers[-1], layers[-1])
         skip_layers.pop()
 
-        relu2 = double_conv(joint, i * 2, i)
+        relu2 = double_conv(joint, i)
 
         # todo
-        sample = upsample(relu2, i / 2, i, batch_size)
+        sample = upsample(relu2, i, batch_size)
         layers.append(sample)
 
     i = 64
     joint = skip_connect(skip_layers[-1], layers[-1])
     skip_layers.pop()
 
-    relu2 = double_conv(joint, i * 2, i)
+    relu2 = double_conv(joint, i)
 
     # todo
-    sample = gen_conv(relu2, i, 1)
+    sample = gen_conv(relu2, 1)
     norm3 = batchnorm(sample)
 
     return norm3
