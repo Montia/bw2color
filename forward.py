@@ -2,8 +2,8 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 32
-MAX_OUTPUT_CHANNEL_LAYER = 4
+FIRST_OUTPUT_CHANNEL = 8
+MAX_OUTPUT_CHANNEL_LAYER = 8
 REGULARIZER = 0
 DROPOUT = 0.5
 
@@ -12,10 +12,6 @@ def get_weight(shape, regularizer=None):
     if regularizer != None:
         tf.add_to_collection('losses', tf.contrib.layers.l2_regularizer(regularizer)(w))
     return w
-
-def get_bias(shape):
-    b = tf.Variable(tf.zeros(shape))
-    return b
 
 def gen_conv(X, kernels, regularizer=None):
     w = get_weight([KERNEL_SIZE, KERNEL_SIZE, X.get_shape().as_list()[-1], kernels], regularizer)
@@ -45,6 +41,7 @@ def forward(X, batch_size, training):
         normed = batchnorm(convolved)
         output = lrelu(normed)
         layers.append(output)
+    #return layers[9]
 
     #Decoder
     for i in range(8):
@@ -61,10 +58,7 @@ def forward(X, batch_size, training):
     output = gen_deconv(tf.concat([output, layers[1]], axis=3), 3, batch_size)
     output = tf.nn.tanh(output)
     layers.append(output)
-    #for layer in layers:
-    #    print(layer)
-    #temp = lrelu(batchnorm(gen_conv(layer[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(3, i))))
-    return layers[-1]
+    return layers[-1], layers[9]
     
 
         

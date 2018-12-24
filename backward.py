@@ -8,26 +8,28 @@ import forward
 import generateds
 from tqdm import tqdm, trange
 
-BATCH_SIZE = 1
-L1_WEIGHT = 50
+BATCH_SIZE = 16
+L1_WEIGHT = 100
 GAN_WEIGHT = 1
+GUIDE_DECODER_WEIGHT = 1.2
 EPS = 1e-12
 LEARNING_RATE = 2e-04
 BETA1 = 0.5
 EMA_DECAY = 0.98
 MODEL_SAVE_PATH = './model_l1weight={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 MODEL_NAME = 'pix2pix_model'
-TOTAL_STEP = 500000 
+TOTAL_STEP = 100000 
 TRAINING_RESULT_PATH = 'training_result_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
-SAVE_FREQ = 5000
-DISPLAY_FREQ = 1000
+GUIDE_DECODER_PATH = 'guide_decoder_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
+SAVE_FREQ = 500
+DISPLAY_FREQ = 100
+DISPLAY_GUIDE_DECODER_FREQ = 100
 
 def backward():
     def dis_conv(X, kernels, stride, layer, regularizer=None):
         initializer = tf.truncated_normal_initializer(0, 0.2)
         w = tf.get_variable('w{}'.format(layer), [forward.KERNEL_SIZE, forward.KERNEL_SIZE, X.get_shape().as_list()[-1], kernels], initializer=initializer)
         padded_X = tf.pad(X, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='CONSTANT')
-        #print(w)
         return tf.nn.conv2d(padded_X, w, [1, stride, stride, 1], padding='VALID')
 
     def discriminator(discriminator_input, discriminator_output):
@@ -39,16 +41,28 @@ def backward():
             activation_fn = forward.lrelu if i < 5 else tf.nn.sigmoid
             bn = forward.batchnorm if i < 5 else tf.identity
             layers.append(activation_fn(bn(dis_conv(layers[-1], kernels, stride, i+1))))
-        #for layer in layers:
-        #    print(layer)
+        return layers[-1]
+    
+    def guide_decoder(middle_layer, batch_size):
+        layers = [middle_layer]
+        for i in range(8):
+            deconvolved = forward.gen_deconv(layers[-1], forward.FIRST_OUTPUT_CHANNEL * 2 ** min(forward.MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
+            output = forward.batchnorm(deconvolved)
+            output = forward.lrelu(output)
+            layers.append(output)
+        output = forward.gen_deconv(output, 3, batch_size)
+        output = tf.nn.tanh(output)
+        layers.append(output)
         return layers[-1]
 
     X = tf.placeholder(tf.float32, [None, 512, 512, 3])
     with tf.name_scope('generator'), tf.variable_scope('generator'):
-        Y = forward.forward(X, BATCH_SIZE, True)
+        Y, middle_layer = forward.forward(X, BATCH_SIZE, True)
+        #middle_layer = forward.forward(X, BATCH_SIZE, True)
+        Y_guide = guide_decoder(middle_layer, BATCH_SIZE)
     Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
     XYY = tf.concat([X, Y, Y_real], axis=2)
-
+    
     with tf.name_scope('discriminator_real'):
         with tf.variable_scope('discriminator'):
             discriminator_real = discriminator(X, Y_real)
@@ -65,7 +79,8 @@ def backward():
 
     gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
     gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
-    gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
+    guide_decoder_loss =  tf.reduce_mean(tf.abs(Y_guide - Y_real))
+    gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * (gen_loss_GAN + GUIDE_DECODER_WEIGHT * guide_decoder_loss)
     gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
     gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
     gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
@@ -77,7 +92,10 @@ def backward():
     global_step = tf.Variable(0, trainable=False)
     incr_global_step = tf.assign(global_step, global_step + 1) 
 
-    train_op = tf.group([dis_train_op,  gen_train_op, ema_op, incr_global_step])
+    train_op = tf.group([dis_train_op, gen_train_op, ema_op, incr_global_step])
+    gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
+    guide_decoder_train_op = tf.train.AdamOptimizer(LEARNING_RATE, BETA1).minimize(guide_decoder_loss, var_list=gen_vars)
+    #train_op = tf.group([guide_decoder_train_op, ema_op, incr_global_step])
 
     saver = tf.train.Saver()
     X_batch, Y_real_batch = generateds.get_tfrecord(BATCH_SIZE, True)
@@ -86,6 +104,8 @@ def backward():
         os.mkdir(MODEL_SAVE_PATH)
     if not os.path.exists(TRAINING_RESULT_PATH):
         os.mkdir(TRAINING_RESULT_PATH)
+    if not os.path.exists(GUIDE_DECODER_PATH):
+        os.mkdir(GUIDE_DECODER_PATH)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -105,14 +125,22 @@ def backward():
             if step % SAVE_FREQ == 0:
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
             if step % DISPLAY_FREQ == 0:
-                glloss, ggloss, dloss = sess.run([gen_loss_L1, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
-                print('\rSteps: {}, Generator L1 loss: {}, Generator GAN loss: {}, Discriminator loss: {}'.format(step, glloss, ggloss, dloss))
+                glloss, gdloss, ggloss, dloss = sess.run([gen_loss_L1, guide_decoder_loss, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
+                print('\rSteps: {}, Generator L1 loss: {:.6f},{:.6f}, Generator GAN loss: {:.6f}, Discriminator loss: {:.6f}'.format(step, glloss, gdloss, ggloss, dloss))
                 test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
                 for i, img in enumerate(test_result):
                     img = (img + 1) / 2
                     img *= 256
                     img = img.astype(np.uint8)
-                    Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step-{}.png'.format(step)))
+                    Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step{}-{}.png'.format(step, i+1)))
+            if step % DISPLAY_GUIDE_DECODER_FREQ == 0:
+                guide_result, guide_loss = sess.run([Y_guide, guide_decoder_loss], feed_dict={X:xs, Y_real:ys})
+                print('\rSteps: {}, Guide loss: {}'.format(step, guide_loss))
+                for i, img in enumerate([guide_result[0]]):
+                    img = (img + 1) / 2
+                    img *= 256
+                    img = img.astype(np.uint8)
+                    Image.fromarray(img).save(os.path.join(GUIDE_DECODER_PATH, 'Step-{}.png'.format(step)))
             print('\r{}'.format(step), end='')
 
         coord.request_stop()
