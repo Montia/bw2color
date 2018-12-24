@@ -15,7 +15,7 @@ def test():
     with tf.name_scope('generator'), tf.variable_scope('generator'):
         Y = forward.forward(X, backward.BATCH_SIZE, False)
     Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
-    XYY = tf.concat([X, Y, Y_real], axis=2)
+    XY = tf.concat([X, Y], axis=2)
 
     ema = tf.train.ExponentialMovingAverage(backward.EMA_DECAY)
     global_step = tf.Variable(0, trainable=False)
@@ -40,7 +40,7 @@ def test():
 
         for i in range(TEST_NUM):
             xs, ys = sess.run([X_batch, Y_real_batch])
-            img = sess.run(XYY, feed_dict={X: xs, Y_real: ys})
+            img = sess.run(XY, feed_dict={X: xs, Y_real: ys})
             img = (img + 1) / 2
             img *= 256
             img = img.astype(np.uint8)
