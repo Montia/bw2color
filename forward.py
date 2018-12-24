@@ -2,13 +2,13 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 8
-MAX_OUTPUT_CHANNEL_LAYER = 5
+FIRST_OUTPUT_CHANNEL = 32
+MAX_OUTPUT_CHANNEL_LAYER = 4
 REGULARIZER = 0
 DROPOUT = 0.5
 
 def get_weight(shape, regularizer=None):
-    w = tf.Variable(tf.random_normal(shape, stddev=0.2))
+    w = tf.Variable(tf.random_normal(shape, stddev=0.5))
     if regularizer != None:
         tf.add_to_collection('losses', tf.contrib.layers.l2_regularizer(regularizer)(w))
     return w

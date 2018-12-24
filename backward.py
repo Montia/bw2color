@@ -9,7 +9,7 @@ import generateds
 from tqdm import tqdm, trange
 
 BATCH_SIZE = 1
-L1_WEIGHT = 0
+L1_WEIGHT = 50
 GAN_WEIGHT = 1
 EPS = 1e-12
 LEARNING_RATE = 2e-04
@@ -17,7 +17,7 @@ BETA1 = 0.5
 EMA_DECAY = 0.98
 MODEL_SAVE_PATH = './model_l1weight={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 MODEL_NAME = 'pix2pix_model'
-TOTAL_STEP = 300000
+TOTAL_STEP = 500000 
 TRAINING_RESULT_PATH = 'training_result_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 SAVE_FREQ = 5000
 DISPLAY_FREQ = 1000
@@ -35,7 +35,7 @@ def backward():
         layers = [X]
         for i in range(6):
             stride = 2 if i < 4 else 1
-            kernels = forward.FIRST_OUTPUT_CHANNEL * 2 ** i if i < 5 else 1
+            kernels = forward.FIRST_OUTPUT_CHANNEL / 2 * 2 ** i if i < 5 else 1
             activation_fn = forward.lrelu if i < 5 else tf.nn.sigmoid
             bn = forward.batchnorm if i < 5 else tf.identity
             layers.append(activation_fn(bn(dis_conv(layers[-1], kernels, stride, i+1))))
@@ -63,22 +63,21 @@ def backward():
     dis_grads_and_vars = dis_optimizer.compute_gradients(dis_loss, var_list=dis_vars)
     dis_train_op = dis_optimizer.apply_gradients(dis_grads_and_vars)
 
-    with tf.control_dependencies([dis_train_op]):
-        gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
-        gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
-        gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
-        gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
-        gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
-        gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
-        gen_train_op = gen_optimizer.apply_gradients(gen_grads_and_vars)
+    gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
+    gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
+    gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
+    gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
+    gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
+    gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
+    gen_train_op = gen_optimizer.apply_gradients(gen_grads_and_vars)
 
     ema = tf.train.ExponentialMovingAverage(EMA_DECAY)
     ema_op = ema.apply(tf.trainable_variables())
 
     global_step = tf.Variable(0, trainable=False)
-    incr_global_step = tf.assign(global_step, global_step + 1)
+    incr_global_step = tf.assign(global_step, global_step + 1) 
 
-    train_op = tf.group([dis_train_op, ema_op, incr_global_step])
+    train_op = tf.group([dis_train_op,  gen_train_op, ema_op, incr_global_step])
 
     saver = tf.train.Saver()
     X_batch, Y_real_batch = generateds.get_tfrecord(BATCH_SIZE, True)
