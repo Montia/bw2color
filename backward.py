@@ -9,8 +9,9 @@ import generateds
 from tqdm import tqdm, trange
 
 BATCH_SIZE = 1
-L1_WEIGHT = 0
+L1_WEIGHT = 20
 GAN_WEIGHT = 1
+GUIDE_DECODER_WEIGHT = 0.9
 EPS = 1e-12
 LEARNING_RATE = 2e-04
 BETA1 = 0.5
@@ -42,13 +43,27 @@ def backward():
         #for layer in layers:
         #    print(layer)
         return layers[-1]
+    
+    def guide_decoder(middle_layer, batch_size):
+        layers = [middle_layer]
+        print(middle_layer)
+        for i in range(8):
+            deconvolved = forward.gen_deconv(layers[-1], forward.FIRST_OUTPUT_CHANNEL * 2 ** min(forward.MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
+            output = forward.batchnorm(deconvolved)
+            output = forward.lrelu(output)
+            layers.append(output)
+        output = forward.gen_deconv(output, 3, batch_size)
+        output = tf.nn.tanh(output)
+        layers.append(output)
+        return layers[-1]
 
     X = tf.placeholder(tf.float32, [None, 512, 512, 3])
     with tf.name_scope('generator'), tf.variable_scope('generator'):
-        Y = forward.forward(X, BATCH_SIZE, True)
+        Y, middle_layer = forward.forward(X, BATCH_SIZE, True)
+        Y_guide = guide_decoder(middle_layer, BATCH_SIZE)
     Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
     XYY = tf.concat([X, Y, Y_real], axis=2)
-
+    
     with tf.name_scope('discriminator_real'):
         with tf.variable_scope('discriminator'):
             discriminator_real = discriminator(X, Y_real)
@@ -65,7 +80,7 @@ def backward():
 
     with tf.control_dependencies([dis_train_op]):
         gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
-        gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
+        gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real)) + GUIDE_DECODER_WEIGHT * tf.reduce_mean(tf.abs(Y_guide - Y_real))
         gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
         gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
         gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)

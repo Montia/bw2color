@@ -2,8 +2,8 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 8
-MAX_OUTPUT_CHANNEL_LAYER = 5
+FIRST_OUTPUT_CHANNEL = 32
+MAX_OUTPUT_CHANNEL_LAYER = 4
 REGULARIZER = 0
 DROPOUT = 0.5
 
@@ -60,7 +60,7 @@ def forward(X, batch_size, training):
     #for layer in layers:
     #    print(layer)
     #temp = lrelu(batchnorm(gen_conv(layer[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(3, i))))
-    return layers[-1]
+    return layers[-1], layers[9]
     
 
         
