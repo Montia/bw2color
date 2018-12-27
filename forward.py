@@ -2,8 +2,8 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 8
-MAX_OUTPUT_CHANNEL_LAYER = 8
+FIRST_OUTPUT_CHANNEL = 16
+MAX_OUTPUT_CHANNEL_LAYER = 7
 REGULARIZER = 0
 DROPOUT = 0.5
 
@@ -58,7 +58,10 @@ def forward(X, batch_size, training):
     output = gen_deconv(tf.concat([output, layers[1]], axis=3), 3, batch_size)
     output = tf.nn.tanh(output)
     layers.append(output)
-    return layers[-1], layers[9]
+    if training == True:
+        return layers[-1], layers[9]
+    else:
+        return layers[-1]
     
 
         

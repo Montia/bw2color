@@ -6,22 +6,23 @@ import forward
 import generateds
 import backward
 
-TEST_NUM = 100
+TEST_NUM = 200
 TEST_RESULT_PATH = 'test_result_l1weight={},gfc={}, mcl={}'.format(backward.L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 
 
 def test():
     X = tf.placeholder(tf.float32, [None, 512, 512, 3])
     with tf.name_scope('generator'), tf.variable_scope('generator'):
-        Y = forward.forward(X, backward.BATCH_SIZE, False)
+        Y = forward.forward(X, 1, False)
     Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
-    XY = tf.concat([X, Y], axis=2)
+    XYY = tf.concat([X, Y, Y_real], axis=2)
 
-    ema = tf.train.ExponentialMovingAverage(backward.EMA_DECAY)
+    #ema = tf.train.ExponentialMovingAverage(backward.EMA_DECAY)
     global_step = tf.Variable(0, trainable=False)
-    saver = tf.train.Saver(ema.variables_to_restore())
+    #saver = tf.train.Saver(ema.variables_to_restore())
+    saver = tf.train.Saver()
 
-    X_batch, Y_real_batch = generateds.get_tfrecord(backward.BATCH_SIZE, False)
+    X_batch, Y_real_batch = generateds.get_tfrecord(1, False)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -32,6 +33,7 @@ def test():
         else:
             print('Checkpoint Not Found')
             return
+        
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         
@@ -40,7 +42,7 @@ def test():
 
         for i in range(TEST_NUM):
             xs, ys = sess.run([X_batch, Y_real_batch])
-            img = sess.run(XY, feed_dict={X: xs, Y_real: ys})
+            img = sess.run(XYY, feed_dict={X: xs, Y_real: ys})
             img = (img + 1) / 2
             img *= 256
             img = img.astype(np.uint8)

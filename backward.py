@@ -6,9 +6,9 @@ import os
 from time import sleep
 import forward
 import generateds
-from tqdm import tqdm, trange
+from tqdm import tqdm, trang
 
-BATCH_SIZE = 16
+BATCH_SIZE = 4
 L1_WEIGHT = 100
 GAN_WEIGHT = 1
 GUIDE_DECODER_WEIGHT = 1.2
@@ -18,12 +18,12 @@ BETA1 = 0.5
 EMA_DECAY = 0.98
 MODEL_SAVE_PATH = './model_l1weight={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 MODEL_NAME = 'pix2pix_model'
-TOTAL_STEP = 100000 
+TOTAL_STEP = 200000 
 TRAINING_RESULT_PATH = 'training_result_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 GUIDE_DECODER_PATH = 'guide_decoder_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
-SAVE_FREQ = 500
-DISPLAY_FREQ = 100
-DISPLAY_GUIDE_DECODER_FREQ = 100
+SAVE_FREQ = 1000
+DISPLAY_FREQ = 500
+DISPLAY_GUIDE_DECODER_FREQ = 500
 
 def backward():
     def dis_conv(X, kernels, stride, layer, regularizer=None):
@@ -86,15 +86,16 @@ def backward():
     gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
     gen_train_op = gen_optimizer.apply_gradients(gen_grads_and_vars)
 
-    ema = tf.train.ExponentialMovingAverage(EMA_DECAY)
-    ema_op = ema.apply(tf.trainable_variables())
+    #ema = tf.train.ExponentialMovingAverage(EMA_DECAY)
+    #ema_op = ema.apply(tf.trainable_variables())
 
     global_step = tf.Variable(0, trainable=False)
     incr_global_step = tf.assign(global_step, global_step + 1) 
 
-    train_op = tf.group([dis_train_op, gen_train_op, ema_op, incr_global_step])
+    #train_op = tf.group([dis_train_op, gen_train_op, ema_op, incr_global_step])
+    train_op = tf.group([dis_train_op, gen_train_op, incr_global_step])
     gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
-    guide_decoder_train_op = tf.train.AdamOptimizer(LEARNING_RATE, BETA1).minimize(guide_decoder_loss, var_list=gen_vars)
+    #guide_decoder_train_op = tf.train.AdamOptimizer(LEARNING_RATE, BETA1).minimize(guide_decoder_loss, var_list=gen_vars)
     #train_op = tf.group([guide_decoder_train_op, ema_op, incr_global_step])
 
     saver = tf.train.Saver()
@@ -107,7 +108,7 @@ def backward():
     if not os.path.exists(GUIDE_DECODER_PATH):
         os.mkdir(GUIDE_DECODER_PATH)
 
-    with tf.Session() as sess:
+    with tf.Session(config=config) as sess:
         sess.run(tf.global_variables_initializer())
 
         ckpt = tf.train.get_checkpoint_state(MODEL_SAVE_PATH)
@@ -128,15 +129,15 @@ def backward():
                 glloss, gdloss, ggloss, dloss = sess.run([gen_loss_L1, guide_decoder_loss, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
                 print('\rSteps: {}, Generator L1 loss: {:.6f},{:.6f}, Generator GAN loss: {:.6f}, Discriminator loss: {:.6f}'.format(step, glloss, gdloss, ggloss, dloss))
                 test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
-                for i, img in enumerate(test_result):
+                for i, img in enumerate(test_result[:3]):
                     img = (img + 1) / 2
                     img *= 256
                     img = img.astype(np.uint8)
                     Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step{}-{}.png'.format(step, i+1)))
             if step % DISPLAY_GUIDE_DECODER_FREQ == 0:
-                guide_result, guide_loss = sess.run([Y_guide, guide_decoder_loss], feed_dict={X:xs, Y_real:ys})
-                print('\rSteps: {}, Guide loss: {}'.format(step, guide_loss))
-                for i, img in enumerate([guide_result[0]]):
+                guide_result = sess.run(Y_guide, feed_dict={X:xs, Y_real:ys})
+                #print('\rSteps: {}, Guide loss: {}'.format(step, guide_loss))
+                for i, img in enumerate(guide_result[:1]):
                     img = (img + 1) / 2
                     img *= 256
                     img = img.astype(np.uint8)
