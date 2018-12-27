@@ -2,8 +2,8 @@ import tensorflow as tf
 
 KERNEL_SIZE = 4
 STRIDE = 2
-FIRST_OUTPUT_CHANNEL = 16
-MAX_OUTPUT_CHANNEL_LAYER = 7
+FIRST_OUTPUT_CHANNEL = 32
+MAX_OUTPUT_CHANNEL_LAYER = 5
 REGULARIZER = 0
 DROPOUT = 0.5
 
@@ -19,11 +19,8 @@ def gen_conv(X, kernels, regularizer=None):
 
 def gen_deconv(X, kernels, batch_size, regularizer=None):
     w = get_weight([KERNEL_SIZE, KERNEL_SIZE, kernels, X.get_shape().as_list()[-1]], regularizer)
-    output_shape = X.get_shape().as_list()
-    output_shape[0] = batch_size
-    output_shape[1] *= 2
-    output_shape[2] *= 2
-    output_shape[3] = kernels
+    input_shape = tf.shape(X)
+    output_shape = [input_shape[0], input_shape[1] * 2, input_shape[2] * 2, kernels]
     return tf.nn.conv2d_transpose(X, w, output_shape=output_shape, strides=[1, STRIDE, STRIDE, 1], padding='SAME')
 
 def batchnorm(inputs):
@@ -36,30 +33,29 @@ def forward(X, batch_size, training):
     #X的形状为[None, 512, 512, 3], 值为-1到1
     layers = [X]
     #Encoder
-    for i in range(9):
+    for i in range(6):
         convolved = gen_conv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, i))
         normed = batchnorm(convolved)
         output = lrelu(normed)
         layers.append(output)
-    #return layers[9]
 
     #Decoder
-    for i in range(8):
-        skip_layer = 9 - i
+    for i in range(5):
+        skip_layer = 6 - i
         if i == 0:
-            deconvolved = gen_deconv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
+            deconvolved = gen_deconv(layers[-1], FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 4 - i), batch_size)
         else:
-            deconvolved = gen_deconv(tf.concat([layers[-1], layers[skip_layer]], axis=3), FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
+            deconvolved = gen_deconv(tf.concat([layers[-1], layers[skip_layer]], axis=3), FIRST_OUTPUT_CHANNEL * 2 ** min(MAX_OUTPUT_CHANNEL_LAYER, 4 - i), batch_size)
         output = batchnorm(deconvolved)
-        if i < 3 and training:
-            output = tf.nn.dropout(output, 1 - DROPOUT)
+        #if i < 3 and training:
+        #    output = tf.nn.dropout(output, 1 - DROPOUT)
         output = lrelu(output)
         layers.append(output)
     output = gen_deconv(tf.concat([output, layers[1]], axis=3), 3, batch_size)
     output = tf.nn.tanh(output)
     layers.append(output)
     if training == True:
-        return layers[-1], layers[9]
+        return layers[-1], layers[6]
     else:
         return layers[-1]
     

@@ -11,10 +11,10 @@ TEST_RESULT_PATH = 'test_result_l1weight={},gfc={}, mcl={}'.format(backward.L1_W
 
 
 def test():
-    X = tf.placeholder(tf.float32, [None, 512, 512, 3])
+    X = tf.placeholder(tf.float32, [None, None, None, 3])
     with tf.name_scope('generator'), tf.variable_scope('generator'):
         Y = forward.forward(X, 1, False)
-    Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
+    Y_real = tf.placeholder(tf.float32, [None, None, None, 3])
     XYY = tf.concat([X, Y, Y_real], axis=2)
 
     #ema = tf.train.ExponentialMovingAverage(backward.EMA_DECAY)

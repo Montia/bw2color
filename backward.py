@@ -6,9 +6,9 @@ import os
 from time import sleep
 import forward
 import generateds
-from tqdm import tqdm, trang
+from tqdm import tqdm, trange
 
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 L1_WEIGHT = 100
 GAN_WEIGHT = 1
 GUIDE_DECODER_WEIGHT = 1.2
@@ -45,8 +45,8 @@ def backward():
     
     def guide_decoder(middle_layer, batch_size):
         layers = [middle_layer]
-        for i in range(8):
-            deconvolved = forward.gen_deconv(layers[-1], forward.FIRST_OUTPUT_CHANNEL * 2 ** min(forward.MAX_OUTPUT_CHANNEL_LAYER, 7 - i), batch_size)
+        for i in range(5):
+            deconvolved = forward.gen_deconv(layers[-1], forward.FIRST_OUTPUT_CHANNEL * 2 ** min(forward.MAX_OUTPUT_CHANNEL_LAYER, 4 - i), batch_size)
             output = forward.batchnorm(deconvolved)
             output = forward.lrelu(output)
             layers.append(output)
@@ -55,12 +55,11 @@ def backward():
         layers.append(output)
         return layers[-1]
 
-    X = tf.placeholder(tf.float32, [None, 512, 512, 3])
+    X = tf.placeholder(tf.float32, [None, None, None, 3])
     with tf.name_scope('generator'), tf.variable_scope('generator'):
         Y, middle_layer = forward.forward(X, BATCH_SIZE, True)
-        #middle_layer = forward.forward(X, BATCH_SIZE, True)
         Y_guide = guide_decoder(middle_layer, BATCH_SIZE)
-    Y_real = tf.placeholder(tf.float32, [None, 512, 512, 3])
+    Y_real = tf.placeholder(tf.float32, [None, None, None, 3])
     XYY = tf.concat([X, Y, Y_real], axis=2)
     
     with tf.name_scope('discriminator_real'):
@@ -95,8 +94,6 @@ def backward():
     #train_op = tf.group([dis_train_op, gen_train_op, ema_op, incr_global_step])
     train_op = tf.group([dis_train_op, gen_train_op, incr_global_step])
     gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
-    #guide_decoder_train_op = tf.train.AdamOptimizer(LEARNING_RATE, BETA1).minimize(guide_decoder_loss, var_list=gen_vars)
-    #train_op = tf.group([guide_decoder_train_op, ema_op, incr_global_step])
 
     saver = tf.train.Saver()
     X_batch, Y_real_batch = generateds.get_tfrecord(BATCH_SIZE, True)
@@ -108,7 +105,7 @@ def backward():
     if not os.path.exists(GUIDE_DECODER_PATH):
         os.mkdir(GUIDE_DECODER_PATH)
 
-    with tf.Session(config=config) as sess:
+    with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
         ckpt = tf.train.get_checkpoint_state(MODEL_SAVE_PATH)
