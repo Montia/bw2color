@@ -36,7 +36,8 @@ def backward():
             stride = 2 if i < 3 else 1
             kernels = forward.FIRST_OUTPUT_CHANNEL * 2 ** i if i < 4 else 1
             activation_fn = forward.lrelu if i < 4 else tf.nn.sigmoid
-            layers.append(activation_fn(forward.batchnorm(dis_conv(layers[-1], kernels, stride, i+1))))
+            bn = forward.batchnorm if i < 4 else tf.identity
+            layers.append(activation_fn(bn(dis_conv(layers[-1], kernels, stride, i+1))))
         #for layer in layers:
         #    print(layer)
         return layers[-1]
