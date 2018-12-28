@@ -57,9 +57,18 @@ def joint512img(left, right):
     new_img.paste(right, (512, 0))
     return new_img
 
+def join_img(left, right):
+    assert(left.size == right.size)
+    width = left.size[0] * 2
+    height = left.size[1]
+    new_img = Image.new('RGB', (width, height))
+    new_img.paste(left, (0, 0))
+    new_img.paste(right, (left.size[0], 0))
+    return new_img
+
 # Combine image with its gray image horizontally [img, gray_img]
 def color_with_gray(img: Image):
-    return joint512img(img, img.convert('L'))
+    return join_img(img, img.convert('L'))
 
 
 def color_with_sketch(img: Image):
@@ -84,10 +93,11 @@ def preprocess(input, output, method, train_ratio=0.8):
     for image in tqdm(files):
         sub_dir = 'train/' if random.random() < train_ratio else 'test/'
         save_path = output + sub_dir + image.split('/')[-1]
-        try:
+        '''try:
             method(image).save(save_path)
         except:
-            print('image %s is wrong' % image)
+            print('image %s is wrong' % image)'''
+        method(image).save(save_path)
 
 
 # ============================================================================
@@ -98,7 +108,7 @@ def preprocess(input, output, method, train_ratio=0.8):
 
 def crop2gray(path):
     img = Image.open(path)
-    return color_with_gray(crop_img(img, (512, 512)))
+    return color_with_gray(img)
 
 
 def crop2sketch(path):
