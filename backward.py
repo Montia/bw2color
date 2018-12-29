@@ -88,55 +88,54 @@ def backward():#反向传播模块，包括了GAN的判别器、guide decoder以
 
     train_op = tf.group([dis_train_op, gen_train_op, incr_global_step])#把判别器、生成器的训练步骤以及global step加一组合起来
     
-    saver = tf.train.Saver()#用来保存、读取模型的saver
+    saver = tf.train.Saver()#定义用来保存、读取模型的saver
     X_batch, Y_real_batch = generateds.get_tfrecord(BATCH_SIZE, True)#从tfrecord中获取黑白图和对应彩图
 
-    if not os.path.exists(MODEL_SAVE_PATH):#创建需要但尚未创建的目录
-        os.mkdir(MODEL_SAVE_PATH)#创建需要但尚未创建的目录
-    if not os.path.exists(TRAINING_RESULT_PATH):#创建需要但尚未创建的目录
-        os.mkdir(TRAINING_RESULT_PATH)#创建需要但尚未创建的目录
-    if not os.path.exists(GUIDE_DECODER_PATH):#创建需要但尚未创建的目录
-        os.mkdir(GUIDE_DECODER_PATH)#创建需要但尚未创建的目录
+    if not os.path.exists(MODEL_SAVE_PATH):#创建需要但尚未创建的模型存储目录
+        os.mkdir(MODEL_SAVE_PATH)#创建需要但尚未创建的模型存储目录
+    if not os.path.exists(TRAINING_RESULT_PATH):#创建需要但尚未创建的训练结果目录
+        os.mkdir(TRAINING_RESULT_PATH)#创建需要但尚未创建的训练结果目录
+    if not os.path.exists(GUIDE_DECODER_PATH):#创建需要但尚未创建的guide decoder效果目录
+        os.mkdir(GUIDE_DECODER_PATH)#创建需要但尚未创建的guide decoder效果目录
 
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.Session() as sess:#开启会话
+        sess.run(tf.global_variables_initializer())#全局变量初始化
 
-        ckpt = tf.train.get_checkpoint_state(MODEL_SAVE_PATH)
-        if ckpt and ckpt.model_checkpoint_path:
-            saver.restore(sess, ckpt.model_checkpoint_path)
+        ckpt = tf.train.get_checkpoint_state(MODEL_SAVE_PATH)#在模型存放路径中获取模型checkpoint的状态
+        if ckpt and ckpt.model_checkpoint_path:#如果存在checkpoint且可以获得其最新版本的路径
+            saver.restore(sess, ckpt.model_checkpoint_path)#从模型的最新版本路径读取模型中的参数
 
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        coord = tf.train.Coordinator()#创建一个coordinator
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)#创建读取数据的线程们
 
-        for i in range(global_step.eval(), TOTAL_STEP):
-            xs, ys = sess.run([X_batch, Y_real_batch])
-            _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
-            for i in range(4):
-                sess.run(gen_train_op, feed_dict={X:xs, Y_real:ys})
-            if step % SAVE_FREQ == 0:
-                saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
-            if step % DISPLAY_FREQ == 0:
-                glloss, ggloss, dloss = sess.run([gen_loss_L1, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
-                print('\rSteps: {}, Generator L1 loss: {:.6f}, Generator GAN loss: {:.6f}, Discriminator loss: {:.6f}'.format(step, glloss , ggloss, dloss))
-                test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
-                for i, img in enumerate(test_result[:3]):
-                    img = (img + 1) / 2
-                    img *= 256
-                    img = img.astype(np.uint8)
-                    Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step{}-{}.png'.format(step, i+1)))
-            if step % DISPLAY_GUIDE_DECODER_FREQ == 0:
-                guide_result = sess.run(Y_guide, feed_dict={X:xs, Y_real:ys})
-                for i, img in enumerate(guide_result[:1]):
-                    img = (img + 1) / 2
-                    img *= 256
-                    img = img.astype(np.uint8)
-                    Image.fromarray(img).save(os.path.join(GUIDE_DECODER_PATH, 'Step-{}.png'.format(step)))
-            print('\r{}'.format(step), end='')
+        for i in range(global_step.eval(), TOTAL_STEP):#从当前轮数到总轮数，一轮一轮训练模型
+            xs, ys = sess.run([X_batch, Y_real_batch])#从tfrecord中读取x和y的下一批数据
+            _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})#执行训练步骤，并获取轮数和损失
+            for i in range(4):#为了生成器和判别器的平衡，再训练四次生成器
+                sess.run(gen_train_op, feed_dict={X:xs, Y_real:ys})#训练生成器
+            if step % SAVE_FREQ == 0:#如果到了该保存模型的轮数
+                saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)#保存模型
+            if step % DISPLAY_FREQ == 0:#如果到了该展示训练效果的轮数
+                glloss, ggloss, dloss = sess.run([gen_loss_L1, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})#获取三部分的loss
+                print('\rSteps: {}, Generator L1 loss: {:.6f}, Generator GAN loss: {:.6f}, Discriminator loss: {:.6f}'.format(step, glloss , ggloss, dloss))#输出轮数和各部分loss
+                test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})#获取黑白图、生成图、原材图的拼接
+                for i, img in enumerate(test_result[:3]):#对于这批图的前三张
+                    img = (img + 1) / 2#从-1～1映射到0～1
+                    img *= 256#再映射到0～256
+                    img = img.astype(np.uint8)#类型化为uint8
+                    Image.fromarray(img).save(os.path.join(TRAINING_RESULT_PATH, 'Step{}-{}.png'.format(step, i+1)))#转成图片并保存
+            if step % DISPLAY_GUIDE_DECODER_FREQ == 0:#如果到了该展示guide decoder效果的轮数
+                guide_result = sess.run(Y_guide, feed_dict={X:xs, Y_real:ys})#获取guide decoder生成的图片
+                for i, img in enumerate(guide_result[:1]):#对于该批图片的第一张
+                    img = (img + 1) / 2#从-1～1映射到0～1
+                    img *= 256#再映射到0～256
+                    img = img.astype(np.uint8)#类型化为uint8
+                    Image.fromarray(img).save(os.path.join(GUIDE_DECODER_PATH, 'Step-{}.png'.format(step)))#转成图片并保存
+            print('\r{}'.format(step), end='')#输出训练轮数
 
-        coord.request_stop()
-        coord.join(threads)
+        coord.request_stop()#要求读取图片的线程们停止
+        coord.join(threads)#等待他们停止
 
-
-if __name__ == '__main__':
-    backward()
+if __name__ == '__main__':#执行此脚本时
+    backward()#调用反向传播函数进行模型练
 
