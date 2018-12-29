@@ -9,21 +9,22 @@ import generateds
 from tqdm import tqdm, trange
 
 BATCH_SIZE = 1
-L1_WEIGHT = 40
+L1_WEIGHT = 50
 GAN_WEIGHT = 1
-GUIDE_DECODER_WEIGHT = 1.2
+GUIDE_DECODER_WEIGHT = 1
 EPS = 1e-12
 LEARNING_RATE = 2e-04
 BETA1 = 0.5
 EMA_DECAY = 0.98
-MODEL_SAVE_PATH = './model_l1weight={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
+PARAMS = 'l1weight={},gfc={}, mcl={} with guide decoder'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
+MODEL_SAVE_PATH = 'model_{}'.format(PARAMS)
 MODEL_NAME = 'pix2pix_model'
 TOTAL_STEP = 200000 
-TRAINING_RESULT_PATH = 'training_result_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
-GUIDE_DECODER_PATH = 'guide_decoder_l1={},gfc={}, mcl={}'.format(L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
+TRAINING_RESULT_PATH = 'training_result_{}'.format(PARAMS)
+GUIDE_DECODER_PATH = 'guide_decoder_{}'.format(PARAMS)
 SAVE_FREQ = 1000
-DISPLAY_FREQ = 500
-DISPLAY_GUIDE_DECODER_FREQ = 500
+DISPLAY_FREQ = 100
+DISPLAY_GUIDE_DECODER_FREQ = 100 
 
 def backward():
     def dis_conv(X, kernels, stride, layer, regularizer=None):
@@ -45,7 +46,7 @@ def backward():
     
     def guide_decoder(middle_layer, batch_size):
         layers = [middle_layer]
-        for i in range(5 ):
+        for i in range(5):
             deconvolved = forward.gen_deconv(layers[-1], forward.FIRST_OUTPUT_CHANNEL * 2 ** min(forward.MAX_OUTPUT_CHANNEL_LAYER, 4 - i), batch_size)
             output = forward.batchnorm(deconvolved)
             output = forward.lrelu(output)
@@ -73,17 +74,16 @@ def backward():
     dis_loss = tf.reduce_mean(-tf.log(discriminator_real + EPS) -tf.log(1 - discriminator_fake + EPS))
     dis_vars = [var for var in tf.trainable_variables() if var.name.startswith('discriminator')]
     dis_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
-    dis_grads_and_vars = dis_optimizer.compute_gradients(dis_loss, var_list=dis_vars)
-    dis_train_op = dis_optimizer.apply_gradients(dis_grads_and_vars)
+    dis_train_op = dis_optimizer.minimize(dis_loss, var_list=dis_vars)
 
     gen_loss_GAN = tf.reduce_mean(-tf.log(discriminator_fake + EPS))
     gen_loss_L1 = tf.reduce_mean(tf.abs(Y - Y_real))
     guide_decoder_loss =  tf.reduce_mean(tf.abs(Y_guide - Y_real))
-    gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * (gen_loss_GAN + GUIDE_DECODER_WEIGHT * guide_decoder_loss)
+    gen_loss = L1_WEIGHT * (gen_loss_L1 + GUIDE_DECODER_WEIGHT * guide_decoder_loss) + GAN_WEIGHT * gen_loss_GAN
+    #gen_loss = L1_WEIGHT * gen_loss_L1 + GAN_WEIGHT * gen_loss_GAN
     gen_vars = [var for var in tf.trainable_variables() if var.name.startswith('generator')]
     gen_optimizer = tf.train.AdamOptimizer(LEARNING_RATE, BETA1)
-    gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, var_list=gen_vars)
-    gen_train_op = gen_optimizer.apply_gradients(gen_grads_and_vars)
+    gen_train_op = gen_optimizer.minimize(gen_loss, var_list=gen_vars)
 
     #ema = tf.train.ExponentialMovingAverage(EMA_DECAY)
     #ema_op = ema.apply(tf.trainable_variables())
@@ -118,13 +118,16 @@ def backward():
         for i in range(global_step.eval(), TOTAL_STEP):
             xs, ys = sess.run([X_batch, Y_real_batch])
             _, step = sess.run([train_op, global_step], feed_dict={X:xs, Y_real:ys})
+            for i in range(4):
+                sess.run(gen_train_op, feed_dict={X:xs, Y_real:ys})
             #print(sess.run(discriminator_real, feed_dict={X:xs, Y_real:ys}))
             #sleep(30)
             if step % SAVE_FREQ == 0:
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
             if step % DISPLAY_FREQ == 0:
-                glloss, gdloss, ggloss, dloss = sess.run([gen_loss_L1, guide_decoder_loss, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
-                print('\rSteps: {}, Generator L1 loss: {:.6f},{:.6f}, Generator GAN loss: {:.6f}, Discriminator loss: {:.6f}'.format(step, glloss, gdloss, ggloss, dloss))
+                #glloss, gdloss, ggloss, dloss = sess.run([gen_loss_L1, guide_decoder_loss, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
+                glloss, ggloss, dloss = sess.run([gen_loss_L1, gen_loss_GAN, dis_loss], feed_dict={X:xs, Y_real:ys})
+                print('\rSteps: {}, Generator L1 loss: {:.6f}, Generator GAN loss: {:.6f}, Discriminator loss: {:.6f}'.format(step, glloss , ggloss, dloss))
                 test_result = sess.run(XYY, feed_dict={X:xs, Y_real:ys})
                 for i, img in enumerate(test_result[:3]):
                     img = (img + 1) / 2

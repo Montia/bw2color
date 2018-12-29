@@ -6,8 +6,8 @@ import forward
 import generateds
 import backward
 
-TEST_NUM = 200
-TEST_RESULT_PATH = 'test_result_l1weight={},gfc={}, mcl={}'.format(backward.L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
+TEST_NUM = 100
+TEST_RESULT_PATH = 'test_result_l1weight={},gfc={}, mcl={} with guide encoder'.format(backward.L1_WEIGHT, forward.FIRST_OUTPUT_CHANNEL, forward.MAX_OUTPUT_CHANNEL_LAYER)
 
 
 def test():
