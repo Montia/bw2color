@@ -3,6 +3,20 @@ Project for the course Artificial Intelligence in Practice.
 Use cGAN to colorize Anime images.
 Reference: https://arxiv.org/abs/1611.07004
 
+## Dataset
+
+- [nico-opendata](https://nico-opendata.jp/ja/index.html)
+    
+    400k 张动漫图片，需要申请下载，质量一般
+
+- [danbooru2017 512x512](https://www.gwern.net/Danbooru2017)
+
+    主要是女性动漫角色的预处理好的 512x512 大小的图片，质量较高，但风格不统一
+    
+- [海贼王漫画图片](https://github.com/sudheerachary/Manga_Colorization)
+
+    海贼王的漫画图片数据 ~~到处都可以下到，提供一个 github 上的~~
+
 ## project structure
 
 ```vim
