@@ -3,6 +3,8 @@ Project for the course Artificial Intelligence in Practice.
 Use cGAN to colorize Anime images.
 Reference: https://arxiv.org/abs/1611.07004
 
+~~这个 README 暂时很不准确，与代码结构不匹配，需要重构~~
+
 ## Dataset
 
 - [nico-opendata](https://nico-opendata.jp/ja/index.html)
